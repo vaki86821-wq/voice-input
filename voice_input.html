@@ -13,6 +13,7 @@
     --border: #2a2a30;
     --accent: #00e5a0;
     --accent-dim: rgba(0, 229, 160, 0.15);
+    --danger: #ff4f4f;
     --text: #e8e8ec;
     --text-muted: #6b6b7a;
     --mono: 'IBM Plex Mono', monospace;
@@ -41,11 +42,7 @@
     gap: 20px;
   }
 
-  header {
-    display: flex;
-    align-items: baseline;
-    gap: 12px;
-  }
+  header { display: flex; align-items: baseline; gap: 12px; }
 
   h1 {
     font-family: var(--mono);
@@ -62,6 +59,29 @@
     font-family: var(--mono);
   }
 
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    transition: background 0.3s;
+  }
+  .dot.connected { background: var(--accent); animation: pulse 2s infinite; }
+  .dot.error { background: var(--danger); }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
   .textarea-wrap {
     position: relative;
     border: 1px solid var(--border);
@@ -69,7 +89,6 @@
     background: var(--surface);
     transition: border-color 0.2s;
   }
-
   .textarea-wrap:focus-within {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px var(--accent-dim);
@@ -89,27 +108,18 @@
     padding: 20px;
     resize: vertical;
   }
-
-  textarea::placeholder {
-    color: var(--text-muted);
-    font-size: 14px;
-  }
+  textarea::placeholder { color: var(--text-muted); font-size: 14px; }
 
   .char-count {
     position: absolute;
-    bottom: 10px;
-    right: 14px;
+    bottom: 10px; right: 14px;
     font-family: var(--mono);
     font-size: 11px;
     color: var(--text-muted);
     pointer-events: none;
   }
 
-  .actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
+  .actions { display: flex; gap: 10px; align-items: center; }
 
   .btn-send {
     flex: 1;
@@ -117,56 +127,34 @@
     color: #000;
     border: none;
     border-radius: 5px;
-    padding: 13px 24px;
+    padding: 16px 24px;
     font-family: var(--mono);
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
     letter-spacing: 0.08em;
     cursor: pointer;
     transition: opacity 0.15s, transform 0.1s;
   }
-
   .btn-send:hover { opacity: 0.88; }
   .btn-send:active { transform: scale(0.98); }
+  .btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .btn-clear {
     background: transparent;
     color: var(--text-muted);
     border: 1px solid var(--border);
     border-radius: 5px;
-    padding: 13px 18px;
+    padding: 16px 18px;
     font-family: var(--mono);
     font-size: 12px;
     cursor: pointer;
     transition: color 0.15s, border-color 0.15s;
   }
-
-  .btn-clear:hover {
-    color: var(--text);
-    border-color: var(--text-muted);
-  }
-
-  .shortcut-hint {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    text-align: center;
-  }
-
-  kbd {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text);
-  }
+  .btn-clear:hover { color: var(--text); border-color: var(--text-muted); }
 
   .toast {
     position: fixed;
-    bottom: 28px;
-    left: 50%;
+    bottom: 28px; left: 50%;
     transform: translateX(-50%) translateY(20px);
     background: var(--accent);
     color: #000;
@@ -180,33 +168,8 @@
     transition: opacity 0.2s, transform 0.2s;
     pointer-events: none;
   }
-
-  .toast.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-
-  .status-bar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    animation: pulse 2s infinite;
-  }
-
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
-  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error-toast { background: var(--danger); color: #fff; }
 </style>
 </head>
 <body>
@@ -214,45 +177,75 @@
 <div class="container">
   <header>
     <h1>Voice → VS Code</h1>
-    <span class="subtitle">音声入力してCtrl+Shift+Vで転送</span>
+    <span class="subtitle">音声入力して送信ボタンで転送</span>
   </header>
 
   <div class="status-bar">
-    <div class="dot"></div>
-    <span>待機中 — Spokenlyで音声入力してください</span>
+    <div class="dot" id="dot"></div>
+    <span id="statusText">サーバーに接続中...</span>
   </div>
 
   <div class="textarea-wrap">
-    <textarea id="inputArea" placeholder="ここをクリックしてから、Spokenlyで音声入力してください。&#10;&#10;入力が終わったら Ctrl+Shift+V でVS Codeに転送されます。"></textarea>
+    <textarea id="inputArea" placeholder="ここをクリックしてから、Spokenlyで音声入力してください。&#10;&#10;入力が終わったら「VS Codeに送信」ボタンを押してください。"></textarea>
     <span class="char-count" id="charCount">0</span>
   </div>
 
   <div class="actions">
-    <button class="btn-send" onclick="sendToVSCode()">VS Codeに転送　→</button>
+    <button class="btn-send" id="sendBtn" onclick="sendToVSCode()" disabled>▶ VS Codeに送信</button>
     <button class="btn-clear" onclick="clearInput()">クリア</button>
-  </div>
-
-  <div class="shortcut-hint">
-    <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>V</kbd> でも転送できます
   </div>
 </div>
 
-<div class="toast" id="toast">転送しました</div>
+<div class="toast" id="toast"></div>
 
 <script>
   const textarea = document.getElementById('inputArea');
   const charCount = document.getElementById('charCount');
   const toast = document.getElementById('toast');
+  const sendBtn = document.getElementById('sendBtn');
+  const dot = document.getElementById('dot');
+  const statusText = document.getElementById('statusText');
+
+  let ws = null;
+
+  function connect() {
+    ws = new WebSocket('ws://localhost:8765');
+
+    ws.onopen = () => {
+      dot.className = 'dot connected';
+      statusText.textContent = 'サーバー接続済み — 送信可能';
+      sendBtn.disabled = false;
+    };
+
+    ws.onclose = () => {
+      dot.className = 'dot error';
+      statusText.textContent = 'サーバー未接続 — server.js を起動してください';
+      sendBtn.disabled = true;
+      setTimeout(connect, 3000);
+    };
+
+    ws.onerror = () => {
+      dot.className = 'dot error';
+    };
+
+    ws.onmessage = (e) => {
+      if (e.data === 'ok') {
+        showToast('送信しました →');
+        clearInput();
+      }
+    };
+  }
+
+  connect();
 
   textarea.addEventListener('input', () => {
     charCount.textContent = textarea.value.length;
   });
 
   function sendToVSCode() {
-    if (!textarea.value.trim()) return;
-    textarea.select();
-    document.execCommand('copy');
-    showToast('クリップボードにコピーしました — AutoHotkeyが転送します');
+    const text = textarea.value.trim();
+    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(text);
   }
 
   function clearInput() {
@@ -261,21 +254,12 @@
     textarea.focus();
   }
 
-  function showToast(msg) {
+  function showToast(msg, isError = false) {
     toast.textContent = msg;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2500);
+    toast.className = 'toast' + (isError ? ' error-toast' : '') + ' show';
+    setTimeout(() => toast.className = 'toast' + (isError ? ' error-toast' : ''), 2500);
   }
 
-  // Ctrl+Shift+V
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.shiftKey && e.key === 'V') {
-      e.preventDefault();
-      sendToVSCode();
-    }
-  });
-
-  // フォーカス
   textarea.focus();
 </script>
 
